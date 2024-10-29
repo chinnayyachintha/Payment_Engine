@@ -1,0 +1,36 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars.json
+*.tfplan
+
+# Local .terraform directories
+.terraform/
+.terraform.lock.hcl
+
+# Crash log files
+crash.log
+
+# Exclude any temporary files or directories
+*.tmp
+*.bak
+
+# Ignore Terraform workspace files
+.terraform/environments/
+
+# Ignore sensitive variables
+*.tfvars.json
+
+# Ignore any personal settings or IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+
+# Ignore AWS credentials files
+.aws/
+
+# Ignore any other sensitive or configuration files
+*.pem
+*.key
