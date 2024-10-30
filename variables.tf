@@ -5,8 +5,8 @@ variable "aws_region" {
 }
 
 # specifying elavon api key value
-variable "elavon_api_key_value" {
+variable "elavon_auth_token_value" {
   type        = string
-  description = "value of api_key value"
+  description = "value of elavon_auth_token_value"
 }
 
