@@ -13,6 +13,7 @@ sns_client = boto3.client('sns')
 table_name = os.getenv('DYNAMODB_TABLE')
 secret_name = os.getenv('SECRET_NAME')
 sns_topic_arn = os.getenv('SNS_TOPIC_ARN')
+intilysis_url = os.getenv('INTILYSIS_URL')  # New environment variable for Intilysis endpoint
 
 # Initialize DynamoDB table
 table = dynamodb.Table(table_name)
@@ -22,13 +23,13 @@ def lambda_handler(event, context):
         # Get decrypted payment data from the event
         payment_data = event['decryptedData']
         
-        # Fetch the Elavon API key from Secrets Manager
+        # Fetch the Elavon authorization token from Secrets Manager
         secret = secrets_client.get_secret_value(SecretId=secret_name)
         secret_value = json.loads(secret['SecretString'])
-        elavon_api_key = secret_value.get("apiKey")
+        elavon_auth_token = secret_value.get("authorization")  # Fetch the authorization token
         
         # 1. Send payment data to Elavon
-        elavon_response = process_payment_with_elavon(payment_data, elavon_api_key)
+        elavon_response = process_payment_with_elavon(payment_data, elavon_auth_token)
         
         # 2. Log transaction details in DynamoDB
         transaction_id = elavon_response.get("transactionId", "N/A")
@@ -40,6 +41,9 @@ def lambda_handler(event, context):
         
         # 4. Apply rules via the payment gateway rule engine
         apply_payment_rules(payment_data)
+        
+        # 5. Send transaction details to Intilysis
+        send_to_intilysis(transaction_id, payment_data, elavon_response)
         
         return {
             "statusCode": 200,
@@ -55,12 +59,12 @@ def lambda_handler(event, context):
             "error": "Payment processing failed"
         }
 
-def process_payment_with_elavon(payment_data, api_key):
+def process_payment_with_elavon(payment_data, auth_token):
     """Send payment data to Elavon's API and return the response."""
     try:
         # Replace with the actual Elavon API endpoint
-        elavon_url = "https://api.elavon.com/v1/payments"
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        elavon_url = "https://api.elavon.com/v1/payments" # change these with original elavon_url
+        headers = {"Authorization": auth_token, "Content-Type": "application/json"}  # Use auth_token
         response = requests.post(elavon_url, headers=headers, json=payment_data)
         response.raise_for_status()
         return response.json()
@@ -97,11 +101,16 @@ def send_failure_alert(error_message):
         Subject="Transaction Failure Alert"
     )
 
-
-# Explanation:
-
-# process_payment_with_elavon: Sends payment data to the Elavon API for processing and returns the response.
-# log_transaction: Logs transaction details in DynamoDB.
-# process_3ds_authentication: Simulates a call to the 3D Secure API, if required.
-# apply_payment_rules: Applies any necessary rules through the payment gateway rule engine.
-# send_failure_alert: Sends an SNS alert if a transaction fails.
+def send_to_intilysis(transaction_id, payment_data, elavon_response):
+    """Send transaction details to the Intilysis API."""
+    try:
+        intilysis_payload = {
+            "transactionId": transaction_id,
+            "paymentData": payment_data,
+            "elavonResponse": elavon_response
+        }
+        response = requests.post(intilysis_url, json=intilysis_payload)
+        response.raise_for_status()  # Raise an error for bad responses
+        print("Successfully sent data to Intilysis")
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to send data to Intilysis: {e}")
